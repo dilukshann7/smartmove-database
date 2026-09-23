@@ -12,7 +12,6 @@ AS
         WHERE t.status = 'ISSUED'
         GROUP BY r.route_name
         ORDER BY tickets_sold DESC;
-    route_rec route_cursor%ROWTYPE;
 BEGIN
     FOR route_rec IN route_cursor LOOP
         DBMS_OUTPUT.PUT_LINE(route_rec.route_name || ': ' || route_rec.tickets_sold || ' tickets');
@@ -52,7 +51,6 @@ AS
         JOIN tickets t ON b.booking_id = t.booking_id
         WHERE b.passenger_id = p_passenger_id
         ORDER BY b.booking_id, t.ticket_id;
-    history_rec history_cursor%ROWTYPE;
 BEGIN
     FOR history_rec IN history_cursor LOOP
         DBMS_OUTPUT.PUT_LINE('Booking ' || history_rec.booking_id || ': '
@@ -71,7 +69,6 @@ AS
         WHERE m.status = 'SCHEDULED'
           AND m.scheduled_date < TRUNC(p_as_of) + 1
         ORDER BY m.scheduled_date;
-    maintenance_rec maintenance_cursor%ROWTYPE;
 BEGIN
     FOR maintenance_rec IN maintenance_cursor LOOP
         DBMS_OUTPUT.PUT_LINE('Maintenance ' || maintenance_rec.maintenance_id || ': '
@@ -87,7 +84,6 @@ AS
         SELECT t.trip_id, v.seat_count
         FROM trips t JOIN vehicles v ON t.vehicle_id = v.vehicle_id
         ORDER BY t.trip_id;
-    trip_rec trip_cursor%ROWTYPE;
     occupied_seats NUMBER;
     occupancy_percent NUMBER;
 BEGIN

@@ -4,7 +4,7 @@ CREATE OR REPLACE VIEW public_trip_details AS
 SELECT t.trip_id, r.route_name, t.departure_at, t.fare,
        available_seats(t.trip_id) AS remaining_seats
 FROM trips t JOIN routes r ON t.route_id = r.route_id
-WHERE t.status = 'SCHEDULED';
+WHERE t.status = 'SCHEDULED' AND t.departure_at > SYSDATE;
 
 GRANT SELECT ON public_trip_details TO smartmove_app;
 GRANT SELECT ON public_trip_details TO smartmove_reporting;

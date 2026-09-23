@@ -1,16 +1,13 @@
--- Standalone procedures and one function: no packages or collection parameters.
--- Use one SQL Developer session for this classroom demonstration.
--- After checking your changes, enter COMMIT; to save or ROLLBACK; to undo.
+-- Coursework procedures: one task per procedure, manual IDs, one session.
+-- Constraints handle missing values, duplicate IDs and invalid references.
+-- On any error, stop and ROLLBACK. COMMIT only after all steps succeed.
 SET SERVEROUTPUT ON;
 
 -- 1. Schedule a trip. The route supplies its fare.
 CREATE OR REPLACE PROCEDURE schedule_trip (
-    p_trip_id IN NUMBER,
-    p_route_id IN NUMBER,
-    p_vehicle_id IN NUMBER,
-    p_driver_id IN NUMBER,
-    p_departure IN DATE,
-    p_arrival IN DATE
+    p_trip_id IN NUMBER, p_route_id IN NUMBER,
+    p_vehicle_id IN NUMBER, p_driver_id IN NUMBER,
+    p_departure IN DATE, p_arrival IN DATE
 )
 AS
     trip_fare routes.base_fare%TYPE;
@@ -48,16 +45,13 @@ BEGIN
 EXCEPTION
     WHEN invalid_trip THEN
         DBMS_OUTPUT.PUT_LINE('Check the trip times and driver/vehicle availability.');
-    WHEN NO_DATA_FOUND THEN
-        DBMS_OUTPUT.PUT_LINE('Route or vehicle not found.');
+        RAISE;
 END schedule_trip;
 /
 
 -- 2. Create a booking. Add its seats with reserve_seat below.
 CREATE OR REPLACE PROCEDURE create_booking (
-    p_booking_id IN NUMBER,
-    p_passenger_id IN NUMBER,
-    p_trip_id IN NUMBER
+    p_booking_id IN NUMBER, p_passenger_id IN NUMBER, p_trip_id IN NUMBER
 )
 AS
     trip_status trips.status%TYPE;
@@ -78,16 +72,13 @@ BEGIN
 EXCEPTION
     WHEN invalid_booking THEN
         DBMS_OUTPUT.PUT_LINE('This trip is not available for booking.');
-    WHEN NO_DATA_FOUND THEN
-        DBMS_OUTPUT.PUT_LINE('Trip not found.');
+        RAISE;
 END create_booking;
 /
 
 -- 3. Add one seat. Call again with a new ticket ID for another seat.
 CREATE OR REPLACE PROCEDURE reserve_seat (
-    p_ticket_id IN NUMBER,
-    p_booking_id IN NUMBER,
-    p_seat_number IN NUMBER
+    p_ticket_id IN NUMBER, p_booking_id IN NUMBER, p_seat_number IN NUMBER
 )
 AS
     booking_trip bookings.trip_id%TYPE;
@@ -107,7 +98,7 @@ BEGIN
     FROM trips t JOIN vehicles v ON t.vehicle_id = v.vehicle_id
     WHERE t.trip_id = booking_trip;
 
-    -- Check whole numbers using a NUMBER variable, without collections.
+    -- A seat must fit the vehicle and belong to an open booking.
     IF p_seat_number IS NULL OR p_seat_number < 1
        OR p_seat_number > total_seats OR p_seat_number <> TRUNC(p_seat_number)
        OR booking_status <> 'PENDING' OR trip_status <> 'SCHEDULED'
@@ -131,8 +122,7 @@ BEGIN
 EXCEPTION
     WHEN invalid_seat THEN
         DBMS_OUTPUT.PUT_LINE('Seat unavailable, invalid seat number, or booking closed.');
-    WHEN NO_DATA_FOUND THEN
-        DBMS_OUTPUT.PUT_LINE('Booking not found.');
+        RAISE;
 END reserve_seat;
 /
 
@@ -160,10 +150,8 @@ END;
 
 -- 5. Record the full payment and issue the tickets.
 CREATE OR REPLACE PROCEDURE record_payment (
-    p_payment_id IN NUMBER,
-    p_booking_id IN NUMBER,
-    p_amount IN NUMBER,
-    p_method IN VARCHAR2
+    p_payment_id IN NUMBER, p_booking_id IN NUMBER,
+    p_amount IN NUMBER, p_method IN VARCHAR2
 )
 AS
     booking_status bookings.status%TYPE;
@@ -182,23 +170,22 @@ BEGIN
 
     IF booking_status <> 'PENDING' OR trip_status <> 'SCHEDULED'
        OR departure_time <= SYSDATE OR total_amount IS NULL
-       OR p_amount IS NULL OR p_amount <> total_amount
-       OR p_method IS NULL OR p_method NOT IN ('CASH', 'CARD', 'BANK_TRANSFER') THEN
+       OR p_amount IS NULL OR p_amount <> total_amount THEN
         RAISE invalid_payment;
     END IF;
 
     INSERT INTO payments (payment_id, booking_id, amount, payment_method)
     VALUES (p_payment_id, p_booking_id, p_amount, p_method);
 
-    UPDATE tickets SET status = 'ISSUED' WHERE booking_id = p_booking_id;
+    UPDATE tickets SET status = 'ISSUED'
+    WHERE booking_id = p_booking_id AND status = 'RESERVED';
     UPDATE bookings SET status = 'CONFIRMED' WHERE booking_id = p_booking_id;
 
     DBMS_OUTPUT.PUT_LINE('Payment recorded: ' || p_amount);
 EXCEPTION
     WHEN invalid_payment THEN
         DBMS_OUTPUT.PUT_LINE('Check booking, total amount and payment method.');
-    WHEN NO_DATA_FOUND THEN
-        DBMS_OUTPUT.PUT_LINE('Booking not found.');
+        RAISE;
 END record_payment;
 /
 
@@ -224,69 +211,63 @@ BEGIN
 EXCEPTION
     WHEN invalid_cancel THEN
         DBMS_OUTPUT.PUT_LINE('Booking is already cancelled or the trip has departed.');
-    WHEN NO_DATA_FOUND THEN
-        DBMS_OUTPUT.PUT_LINE('Booking not found.');
+        RAISE;
 END cancel_booking;
 /
 
 -- 7. Refund the full payment once, after cancellation.
 CREATE OR REPLACE PROCEDURE process_refund (
-    p_refund_id IN NUMBER,
-    p_payment_id IN NUMBER,
-    p_reason IN VARCHAR2
+    p_refund_id IN NUMBER, p_payment_id IN NUMBER, p_reason IN VARCHAR2
 )
 AS
     paid_amount payments.amount%TYPE;
     booking_status bookings.status%TYPE;
-    refund_count NUMBER;
     invalid_refund EXCEPTION;
 BEGIN
     SELECT p.amount, b.status INTO paid_amount, booking_status
     FROM payments p JOIN bookings b ON p.booking_id = b.booking_id
     WHERE p.payment_id = p_payment_id;
 
-    SELECT COUNT(*) INTO refund_count
-    FROM refunds WHERE payment_id = p_payment_id;
-
-    IF booking_status <> 'CANCELLED' OR refund_count > 0 OR p_reason IS NULL THEN
+    IF booking_status <> 'CANCELLED' THEN
         RAISE invalid_refund;
     END IF;
 
+    -- UNIQUE(payment_id) prevents a second refund. Reason is NOT NULL.
     INSERT INTO refunds (refund_id, payment_id, amount, reason)
     VALUES (p_refund_id, p_payment_id, paid_amount, p_reason);
 
     DBMS_OUTPUT.PUT_LINE('Refund recorded: ' || paid_amount);
 EXCEPTION
     WHEN invalid_refund THEN
-        DBMS_OUTPUT.PUT_LINE('Cancel first, supply a reason, and refund only once.');
-    WHEN NO_DATA_FOUND THEN
-        DBMS_OUTPUT.PUT_LINE('Payment not found.');
+        DBMS_OUTPUT.PUT_LINE('Cancel the booking before refunding it.');
+        RAISE;
 END process_refund;
 /
 
 -- 8. Complete a scheduled maintenance record.
 CREATE OR REPLACE PROCEDURE complete_maintenance (
-    p_maintenance_id IN NUMBER,
-    p_cost IN NUMBER
+    p_maintenance_id IN NUMBER, p_cost IN NUMBER
 )
 AS
-    invalid_cost EXCEPTION;
+    invalid_service EXCEPTION;
 BEGIN
     IF p_cost IS NULL OR p_cost < 0 THEN
-        RAISE invalid_cost;
+        RAISE invalid_service;
     END IF;
 
     UPDATE maintenance_records
     SET status = 'COMPLETED', completed_date = SYSDATE, cost = p_cost
-    WHERE maintenance_id = p_maintenance_id AND status = 'SCHEDULED';
+    WHERE maintenance_id = p_maintenance_id AND status = 'SCHEDULED'
+      AND TRUNC(scheduled_date) <= TRUNC(SYSDATE);
 
     IF SQL%ROWCOUNT = 0 THEN
-        DBMS_OUTPUT.PUT_LINE('No scheduled maintenance found for that ID.');
+        RAISE invalid_service;
     ELSE
         DBMS_OUTPUT.PUT_LINE('Maintenance completed.');
     END IF;
 EXCEPTION
-    WHEN invalid_cost THEN
-        DBMS_OUTPUT.PUT_LINE('Cost cannot be empty or negative.');
+    WHEN invalid_service THEN
+        DBMS_OUTPUT.PUT_LINE('Use a nonnegative cost and an unfinished service due today or earlier.');
+        RAISE;
 END complete_maintenance;
 /
