@@ -2,7 +2,7 @@
 
 Oracle SQL and PL/SQL for transport records, with MongoDB for feedback content and media links. Management and booking operations use short standalone PL/SQL procedures. Queries and reports read the results.
 
-**The revised scripts have not been run or compiled in Oracle.** The local databases were not changed. `docs/execution-results.md` and the saved outputs describe the earlier version only.
+**The revised scripts have not been run or compiled in Oracle.** The local databases were not changed.
 
 ## Read these files in order
 
@@ -29,7 +29,7 @@ Short management procedures restore PL/SQL coverage across all nine operation ar
 
 The booking procedures still check trip times, occupied seats, capacity, payment totals and cancellation status. Table constraints handle duplicate IDs, missing required values, invalid references and repeated refunds. Validation errors print a message and raise an exception so the calling block stops.
 
-This is a single-session classroom example. Procedures check maintenance/trip conflicts and review eligibility, restrict rescheduling to unbooked future trips, and retain history. Whole-trip cancellation releases bookings, with refunds recorded separately. Login, automatic booking expiry and Oracle/MongoDB synchronization remain application work. See `docs/database-operations.md` for the coverage map and limits.
+This is a single-session classroom example. Procedures check maintenance/trip conflicts and review eligibility, restrict rescheduling to unbooked future trips, and retain history. Whole-trip cancellation releases bookings, with refunds recorded separately. Login, automatic booking expiry and Oracle/MongoDB synchronization remain application work.
 
 Coverage was mapped to the supplied DM2 coursework brief. This is authored database logic, not a completed application or a verified mark-band result. The ER diagram, application integration, runtime checks and presentation remain separate tasks.
 
@@ -47,8 +47,8 @@ Procedures do not commit. On failure, stop and roll back the pending workflow. F
 
 For the already populated baseline, a later update needs the three 03 files and file 06 only; do not rerun account, table or sample setup. Apply DDL in a session without pending changes and check compilation before examples.
 
-See `docs/verification.md` for checks to perform later. No build or development server is needed.
+No build or development server is needed.
 
 ## Backup
 
-`backups/before-lecture-simplification-20260923-150530.zip` contains all 30 project files before this change, including uncommitted work. Its contents were compared byte for byte with the originals before editing. Git internals and older backup archives are excluded. This is a source backup, not an export of live database data.
+`backups/before-lecture-simplification-20260923-150530.zip` contains the earlier SQL and MongoDB source files. Documentation entries were removed from the archive. This is a source backup, not an export of live database data.
