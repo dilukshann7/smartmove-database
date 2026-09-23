@@ -36,6 +36,12 @@ BEGIN
         RAISE invalid_trip;
     END IF;
 
+    -- A scheduled maintenance record blocks its whole calendar day.
+    SELECT COUNT(*) INTO conflict_count FROM maintenance_records
+    WHERE vehicle_id = p_vehicle_id AND status = 'SCHEDULED'
+      AND TRUNC(scheduled_date) < p_arrival AND TRUNC(scheduled_date) + 1 > p_departure;
+    IF conflict_count > 0 THEN RAISE invalid_trip; END IF;
+
     INSERT INTO trips (trip_id, route_id, vehicle_id, driver_id,
                        departure_at, arrival_at, fare)
     VALUES (p_trip_id, p_route_id, p_vehicle_id, p_driver_id,
