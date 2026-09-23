@@ -1,6 +1,7 @@
 -- FICTIONAL classroom data. Run once in a fresh schema after files 01-04.
 -- These password placeholders cannot be used to log in to an application.
 SET SERVEROUTPUT ON;
+WHENEVER SQLERROR EXIT FAILURE ROLLBACK
 
 INSERT INTO app_users VALUES (1, 'passenger1@example.test', 'DISABLED_DEMO_HASH', 'PASSENGER');
 INSERT INTO app_users VALUES (2, 'passenger2@example.test', 'DISABLED_DEMO_HASH', 'PASSENGER');
@@ -50,3 +51,5 @@ VALUES (2, 1, 'Routine service', SYSDATE + 14);
 
 -- Check the rows and messages. Enter COMMIT; to save or ROLLBACK; to undo.
 -- Save successful sample data BEFORE running file 06, because its DDL commits.
+
+WHENEVER SQLERROR CONTINUE NONE
