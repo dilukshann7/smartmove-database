@@ -1,51 +1,50 @@
 # SmartMove database coursework
 
-A simple Oracle and MongoDB database example based on the topics in your supplied `skill.md`. The Oracle scripts and MongoDB examples were run locally on 23 September 2026. Compilation, sample reports and the recorded validation checks passed. See `docs/execution-results.md` for results and connection details.
+Oracle SQL and PL/SQL for transport records, with MongoDB for feedback content and media links. Basic record management uses direct SQL; booking operations use standalone procedures.
 
-## What to read first
+**The revised scripts have not been run or compiled in Oracle.** The local databases were not changed. `docs/execution-results.md` and the saved outputs describe the earlier version only.
 
-1. `database/oracle/02_schema.sql` - tables and a status-history trigger.
-2. `database/oracle/03_business_logic.sql` - separate procedures for trips, bookings, seats, payments, cancellations, refunds and maintenance; one function counts available seats.
-3. `database/oracle/04_reports.sql` - five reports using cursors and `DBMS_OUTPUT`.
-4. `database/oracle/05_sample_data.sql` - small, numbered examples showing how the procedures work.
-5. `database/mongodb/setup.js` and `queries.js` - simple documents, inserts, searches, averages and optional CRUD practice.
+## Read these files in order
 
-## When you are ready to run it manually
+| File | What to learn |
+| --- | --- |
+| `database/oracle/01_users.sql` | Database users, a role and privileges |
+| `database/oracle/02_schema.sql` | 13 tables, keys, constraints and a history trigger |
+| `database/oracle/03_business_logic.sql` | Seven procedures and one available-seat function |
+| `database/oracle/04_reports.sql` | Five reports using cursors, joins and totals |
+| `database/oracle/05_sample_data.sql` | Small fictional dataset and procedure calls |
+| `database/oracle/06_permissions.sql` | One trip view and permission grants |
+| `database/oracle/07_basic_operations.sql` | Optional INSERT, SELECT, UPDATE and DELETE practice |
+| `database/oracle/08_booking_example.sql` | Optional booking, payment, cancellation and refund walkthrough |
 
-Use a fresh Oracle schema. These files replace the earlier design; they do not upgrade an existing database.
+Each procedure is defined once. Start with a single operation in file 07, then follow the booking example in file 08. Both practice files undo their changes at the end.
 
-Your local setup is already loaded. Do not rerun the user, schema or sample-data setup files in the existing databases. The steps below are for a new installation.
+MongoDB files remain in `database/mongodb`: `setup.js` creates sample documents, `queries.js` demonstrates queries, and `sample-content.json` is a readable reference. These are mongosh examples, not Node.js programs.
 
-1. Edit the example passwords in `01_users.sql`, then run it as an administrator connected to your PDB, such as XEPDB1.
-2. Connect as `SMARTMOVE_OWNER` and run `02_schema.sql`, `03_business_logic.sql`, `04_reports.sql`, then `05_sample_data.sql` using Run Script in SQL Developer.
-3. Read the output and inspect the rows. If successful, enter `COMMIT;`. If an error occurs, stop and enter `ROLLBACK;` before fixing and retrying the data changes. Table and procedure definitions are not undone by this rollback.
-4. Run `06_permissions.sql` to create the view and grant permissions.
-5. Open mongosh, enter `use smartmove`, then paste the commands from `setup.js` once. Try the commands in `queries.js`. These are mongosh examples, not Node.js files.
+## What became simpler
 
-The procedures print expected validation failures. Read their messages before moving to the next step. They do not save or undo the whole workflow for you. An unexpected Oracle error also means you should stop and roll back the pending changes.
+Basic vehicle, driver, route, user and passenger changes use SQL statements instead of individual management procedures. The longer draft files 07-14, login helpers, extra application views and larger sample dataset are preserved in the backup. They are no longer part of the active installation.
 
-## Simple booking flow
+The booking procedures still check trip times, occupied seats, capacity, payment totals and cancellation status. Table constraints handle duplicate IDs, missing required values, invalid references and repeated refunds. Validation errors print a message and raise an exception so the calling block stops.
 
-Create a booking, reserve one or more seats, then record the full payment. All IDs are entered manually. For example, after loading the sample data, these unused IDs book seat 3 on trip 2:
+This is a single-session classroom example. Maintenance conflicts, review eligibility and changes to existing trips require manual checking. Do not change vehicle capacity after trips use it, or change booked trips directly. Automated rescheduling, whole-trip cancellation/completion, login and Oracle/MongoDB synchronization are outside this version. See `docs/database-operations.md` for the scope changes.
 
-```sql
-SET SERVEROUTPUT ON;
-BEGIN
-    create_booking(4, 1, 2);
-    reserve_seat(5, 4, 3);
-    record_payment(4, 4, 800, 'CASH');
-END;
-/
-```
+The assignment brief was not available in this checkout. Check the reduced automation against the brief before treating this as a final submission.
 
-Read the output before entering `COMMIT;` or `ROLLBACK;`. This example changes the report totals, so check the original sample results in `docs/verification.md` first.
+## When you choose to run it later
 
-## What was simplified
+Do not rerun setup or sample inserts in the populated local databases. This script set is for a fresh installation, not a migration. Use a separate empty test schema and distinct test accounts/role; adjust names in files 01 and 06 together before running.
 
-Packages became standalone procedures. Reports now print text. Dates use `DATE`, seats use numbers, and sample rows have manual IDs. MongoDB uses plain documents instead of schema validators and index setup.
+1. Review the example passwords and run file 01 as an administrator in your PDB.
+2. As the owner, run files 02, 03 and 04 using SQL Developer Run Script. Check compilation errors before continuing.
+3. Run file 05 once. Stop on errors and roll back. Check the sample totals, then enter `COMMIT;` if correct.
+4. Run file 06 after saving sample data; its DDL must not accidentally commit unfinished data changes.
+5. Files 07 and 08 are optional practice. Run each in a separate session with no unrelated unsaved changes. They use ID 90 and finish with `ROLLBACK;`.
 
-This version is for a classroom demonstration using one database session at a time. It keeps multiple seats per booking, but uses one full payment and one full refund. Automatic booking expiry, partial refunds, simultaneous-booking protection and automatic Oracle/MongoDB synchronization are not included. Pending seats remain reserved until the booking is paid or cancelled. Tagged keyword matching replaces full-text search.
+Procedures do not commit. On failure, stop and roll back the pending workflow. Files 05, 07 and 08 include `WHENEVER SQLERROR` for script mode; if running selected statements instead, stop manually on errors. Creating tables/procedures/views is DDL and cannot be undone by rolling back the data.
 
-The Next.js application and login system are not included. `.env.example` is only a future application template. The original files are preserved in `backups/before-simplification-*.zip`.
+See `docs/verification.md` for checks to perform later. No build or development server is needed.
 
-See `docs/database-design.md` for the table relationships, `docs/verification.md` for expected examples, and `docs/backup-restore.md` for a short backup guide.
+## Backup
+
+`backups/before-lecture-simplification-20260923-150530.zip` contains all 30 project files before this change, including uncommitted work. Its contents were compared byte for byte with the originals before editing. Git internals and older backup archives are excluded. This is a source backup, not an export of live database data.
