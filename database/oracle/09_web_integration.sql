@@ -22,27 +22,35 @@ CREATE OR REPLACE PROCEDURE smartmove_database.expire_pending_bookings AS
 BEGIN
     UPDATE smartmove_database.bookings
     SET status = 'CANCELLED'
-    WHERE status = 'PENDING' AND booked_at <= SYSDATE - (30 / 1440);
+    WHERE status = 'PENDING'
+      AND booked_at <= SYSDATE - (30 / 1440);
 
     UPDATE smartmove_database.tickets t
     SET status = 'CANCELLED'
     WHERE status = 'RESERVED'
       AND EXISTS (
-          SELECT 1 FROM smartmove_database.bookings b
-          WHERE b.booking_id = t.booking_id AND b.status = 'CANCELLED'
+          SELECT 1
+          FROM smartmove_database.bookings b
+          WHERE b.booking_id = t.booking_id
+            AND b.status = 'CANCELLED'
       );
 END;
 /
 
 -- Lock the trip for the whole transaction; callers commit or roll back.
 CREATE OR REPLACE PROCEDURE smartmove_database.create_booking (
-    p_booking_id IN NUMBER, p_passenger_id IN NUMBER, p_trip_id IN NUMBER
+    p_booking_id IN NUMBER,
+    p_passenger_id IN NUMBER,
+    p_trip_id IN NUMBER
 ) AS
     v_status smartmove_database.trips.status%TYPE;
     v_departure smartmove_database.trips.departure_at%TYPE;
 BEGIN
-    SELECT status, departure_at INTO v_status, v_departure
-    FROM smartmove_database.trips WHERE trip_id = p_trip_id FOR UPDATE;
+    SELECT status, departure_at
+    INTO v_status, v_departure
+    FROM smartmove_database.trips
+    WHERE trip_id = p_trip_id
+    FOR UPDATE;
     IF v_status <> 'SCHEDULED' OR v_departure <= SYSDATE THEN
         RAISE_APPLICATION_ERROR(-20001, 'Trip is unavailable.');
     END IF;
@@ -52,7 +60,9 @@ END;
 /
 
 CREATE OR REPLACE PROCEDURE smartmove_database.reserve_seat (
-    p_ticket_id IN NUMBER, p_booking_id IN NUMBER, p_seat_number IN NUMBER
+    p_ticket_id IN NUMBER,
+    p_booking_id IN NUMBER,
+    p_seat_number IN NUMBER
 ) AS
     v_trip_id NUMBER;
     v_booking_status VARCHAR2(12);
@@ -63,8 +73,10 @@ CREATE OR REPLACE PROCEDURE smartmove_database.reserve_seat (
     v_seat_count NUMBER;
     v_taken NUMBER;
 BEGIN
-    SELECT trip_id, status, booked_at INTO v_trip_id, v_booking_status, v_booked_at
-    FROM smartmove_database.bookings WHERE booking_id = p_booking_id;
+    SELECT trip_id, status, booked_at
+    INTO v_trip_id, v_booking_status, v_booked_at
+    FROM smartmove_database.bookings
+    WHERE booking_id = p_booking_id;
 
     SELECT t.status, t.departure_at, t.fare, v.seat_count
     INTO v_trip_status, v_departure, v_fare, v_seat_count
@@ -76,14 +88,17 @@ BEGIN
        OR p_seat_number < 1 OR p_seat_number > v_seat_count
        OR v_booking_status <> 'PENDING'
        OR v_booked_at <= SYSDATE - (30 / 1440)
-       OR v_trip_status <> 'SCHEDULED' OR v_departure <= SYSDATE THEN
+       OR v_trip_status <> 'SCHEDULED'
+       OR v_departure <= SYSDATE THEN
         RAISE_APPLICATION_ERROR(-20002, 'Seat or booking is unavailable.');
     END IF;
 
-    SELECT COUNT(*) INTO v_taken
+    SELECT COUNT(*)
+    INTO v_taken
     FROM smartmove_database.tickets t
     JOIN smartmove_database.bookings b ON b.booking_id = t.booking_id
-    WHERE b.trip_id = v_trip_id AND t.seat_number = p_seat_number
+    WHERE b.trip_id = v_trip_id
+      AND t.seat_number = p_seat_number
       AND (t.status = 'ISSUED' OR
            (t.status = 'RESERVED' AND b.status = 'PENDING'
             AND b.booked_at > SYSDATE - (30 / 1440)));
@@ -101,11 +116,13 @@ RETURN NUMBER AS
     v_total NUMBER;
     v_taken NUMBER;
 BEGIN
-    SELECT v.seat_count INTO v_total
+    SELECT v.seat_count
+    INTO v_total
     FROM smartmove_database.trips t
     JOIN smartmove_database.vehicles v ON v.vehicle_id = t.vehicle_id
     WHERE t.trip_id = p_trip_id;
-    SELECT COUNT(*) INTO v_taken
+    SELECT COUNT(*)
+    INTO v_taken
     FROM smartmove_database.tickets t
     JOIN smartmove_database.bookings b ON b.booking_id = t.booking_id
     WHERE b.trip_id = p_trip_id
@@ -113,14 +130,18 @@ BEGIN
            (t.status = 'RESERVED' AND b.status = 'PENDING'
             AND b.booked_at > SYSDATE - (30 / 1440)));
     RETURN v_total - v_taken;
-EXCEPTION WHEN NO_DATA_FOUND THEN RETURN NULL;
+EXCEPTION
+    WHEN NO_DATA_FOUND THEN
+        RETURN NULL;
 END;
 /
 
 -- Payment remains a staff operation; expired holds cannot become tickets.
 CREATE OR REPLACE PROCEDURE smartmove_database.record_payment (
-    p_payment_id IN NUMBER, p_booking_id IN NUMBER,
-    p_amount IN NUMBER, p_method IN VARCHAR2
+    p_payment_id IN NUMBER,
+    p_booking_id IN NUMBER,
+    p_amount IN NUMBER,
+    p_method IN VARCHAR2
 ) AS
     v_status VARCHAR2(12);
     v_booked_at DATE;
@@ -132,28 +153,42 @@ BEGIN
     INTO v_status, v_booked_at, v_trip_status, v_departure
     FROM smartmove_database.bookings b
     JOIN smartmove_database.trips t ON t.trip_id = b.trip_id
-    WHERE b.booking_id = p_booking_id FOR UPDATE OF b.status;
-    SELECT SUM(fare_amount) INTO v_total
+    WHERE b.booking_id = p_booking_id
+    FOR UPDATE OF b.status;
+
+    SELECT SUM(fare_amount)
+    INTO v_total
     FROM smartmove_database.tickets
-    WHERE booking_id = p_booking_id AND status = 'RESERVED';
+    WHERE booking_id = p_booking_id
+      AND status = 'RESERVED';
     IF v_status <> 'PENDING' OR v_booked_at <= SYSDATE - (30 / 1440)
-       OR v_trip_status <> 'SCHEDULED' OR v_departure <= SYSDATE
-       OR v_total IS NULL OR p_amount IS NULL OR p_amount <> v_total THEN
+       OR v_trip_status <> 'SCHEDULED'
+       OR v_departure <= SYSDATE
+       OR v_total IS NULL
+       OR p_amount IS NULL
+       OR p_amount <> v_total THEN
         RAISE_APPLICATION_ERROR(-20004, 'Booking or payment is invalid or expired.');
     END IF;
     INSERT INTO smartmove_database.payments (payment_id, booking_id, amount, payment_method)
     VALUES (p_payment_id, p_booking_id, p_amount, p_method);
-    UPDATE smartmove_database.tickets SET status = 'ISSUED'
-    WHERE booking_id = p_booking_id AND status = 'RESERVED';
-    UPDATE smartmove_database.bookings SET status = 'CONFIRMED'
+    UPDATE smartmove_database.tickets
+    SET status = 'ISSUED'
+    WHERE booking_id = p_booking_id
+      AND status = 'RESERVED';
+
+    UPDATE smartmove_database.bookings
+    SET status = 'CONFIRMED'
     WHERE booking_id = p_booking_id;
 END;
 /
 
 CREATE OR REPLACE PROCEDURE smartmove_database.web_register_passenger (
-    p_email IN VARCHAR2, p_password_hash IN VARCHAR2,
-    p_full_name IN VARCHAR2, p_phone IN VARCHAR2,
-    p_user_id OUT NUMBER, p_passenger_id OUT NUMBER
+    p_email IN VARCHAR2,
+    p_password_hash IN VARCHAR2,
+    p_full_name IN VARCHAR2,
+    p_phone IN VARCHAR2,
+    p_user_id OUT NUMBER,
+    p_passenger_id OUT NUMBER
 ) AS
 BEGIN
     p_user_id := smartmove_database.web_user_seq.NEXTVAL;

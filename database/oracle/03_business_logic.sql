@@ -5,9 +5,12 @@ SET SERVEROUTPUT ON;
 
 -- 1. Schedule a trip. The route supplies its fare.
 CREATE OR REPLACE PROCEDURE schedule_trip (
-    p_trip_id IN NUMBER, p_route_id IN NUMBER,
-    p_vehicle_id IN NUMBER, p_driver_id IN NUMBER,
-    p_departure IN DATE, p_arrival IN DATE
+    p_trip_id IN NUMBER,
+    p_route_id IN NUMBER,
+    p_vehicle_id IN NUMBER,
+    p_driver_id IN NUMBER,
+    p_departure IN DATE,
+    p_arrival IN DATE
 )
 AS
     trip_fare routes.base_fare%TYPE;
@@ -20,27 +23,40 @@ BEGIN
         RAISE invalid_trip;
     END IF;
 
-    SELECT base_fare INTO trip_fare
-    FROM routes WHERE route_id = p_route_id;
+    SELECT base_fare
+    INTO trip_fare
+    FROM routes
+    WHERE route_id = p_route_id;
 
-    SELECT status INTO vehicle_status
-    FROM vehicles WHERE vehicle_id = p_vehicle_id;
+    SELECT status
+    INTO vehicle_status
+    FROM vehicles
+    WHERE vehicle_id = p_vehicle_id;
 
-    SELECT COUNT(*) INTO conflict_count
+    SELECT COUNT(*)
+    INTO conflict_count
     FROM trips
     WHERE status = 'SCHEDULED'
       AND (vehicle_id = p_vehicle_id OR driver_id = p_driver_id)
-      AND departure_at < p_arrival AND arrival_at > p_departure;
+      AND departure_at < p_arrival
+      AND arrival_at > p_departure;
 
     IF vehicle_status <> 'ACTIVE' OR conflict_count > 0 THEN
         RAISE invalid_trip;
     END IF;
 
     -- A scheduled maintenance record blocks its whole calendar day.
-    SELECT COUNT(*) INTO conflict_count FROM maintenance_records
-    WHERE vehicle_id = p_vehicle_id AND status = 'SCHEDULED'
-      AND TRUNC(scheduled_date) < p_arrival AND TRUNC(scheduled_date) + 1 > p_departure;
-    IF conflict_count > 0 THEN RAISE invalid_trip; END IF;
+    SELECT COUNT(*)
+    INTO conflict_count
+    FROM maintenance_records
+    WHERE vehicle_id = p_vehicle_id
+      AND status = 'SCHEDULED'
+      AND TRUNC(scheduled_date) < p_arrival
+      AND TRUNC(scheduled_date) + 1 > p_departure;
+
+    IF conflict_count > 0 THEN
+        RAISE invalid_trip;
+    END IF;
 
     INSERT INTO trips (trip_id, route_id, vehicle_id, driver_id,
                        departure_at, arrival_at, fare)
@@ -57,15 +73,19 @@ END schedule_trip;
 
 -- 2. Create a booking. Add its seats with reserve_seat below.
 CREATE OR REPLACE PROCEDURE create_booking (
-    p_booking_id IN NUMBER, p_passenger_id IN NUMBER, p_trip_id IN NUMBER
+    p_booking_id IN NUMBER,
+    p_passenger_id IN NUMBER,
+    p_trip_id IN NUMBER
 )
 AS
     trip_status trips.status%TYPE;
     departure_time trips.departure_at%TYPE;
     invalid_booking EXCEPTION;
 BEGIN
-    SELECT status, departure_at INTO trip_status, departure_time
-    FROM trips WHERE trip_id = p_trip_id;
+    SELECT status, departure_at
+    INTO trip_status, departure_time
+    FROM trips
+    WHERE trip_id = p_trip_id;
 
     IF trip_status <> 'SCHEDULED' OR departure_time <= SYSDATE THEN
         RAISE invalid_booking;
@@ -84,7 +104,9 @@ END create_booking;
 
 -- 3. Add one seat. Call again with a new ticket ID for another seat.
 CREATE OR REPLACE PROCEDURE reserve_seat (
-    p_ticket_id IN NUMBER, p_booking_id IN NUMBER, p_seat_number IN NUMBER
+    p_ticket_id IN NUMBER,
+    p_booking_id IN NUMBER,
+    p_seat_number IN NUMBER
 )
 AS
     booking_trip bookings.trip_id%TYPE;
@@ -96,12 +118,15 @@ AS
     seat_taken NUMBER;
     invalid_seat EXCEPTION;
 BEGIN
-    SELECT trip_id, status INTO booking_trip, booking_status
-    FROM bookings WHERE booking_id = p_booking_id;
+    SELECT trip_id, status
+    INTO booking_trip, booking_status
+    FROM bookings
+    WHERE booking_id = p_booking_id;
 
     SELECT t.fare, t.status, t.departure_at, v.seat_count
     INTO trip_fare, trip_status, departure_time, total_seats
-    FROM trips t JOIN vehicles v ON t.vehicle_id = v.vehicle_id
+    FROM trips t
+    JOIN vehicles v ON t.vehicle_id = v.vehicle_id
     WHERE t.trip_id = booking_trip;
 
     -- A seat must fit the vehicle and belong to an open booking.
@@ -112,9 +137,12 @@ BEGIN
         RAISE invalid_seat;
     END IF;
 
-    SELECT COUNT(*) INTO seat_taken
-    FROM tickets t JOIN bookings b ON t.booking_id = b.booking_id
-    WHERE b.trip_id = booking_trip AND t.seat_number = p_seat_number
+    SELECT COUNT(*)
+    INTO seat_taken
+    FROM tickets t
+    JOIN bookings b ON t.booking_id = b.booking_id
+    WHERE b.trip_id = booking_trip
+      AND t.seat_number = p_seat_number
       AND t.status IN ('RESERVED', 'ISSUED');
 
     IF seat_taken > 0 THEN
@@ -139,13 +167,18 @@ IS
     total_seats NUMBER;
     booked_seats NUMBER;
 BEGIN
-    SELECT v.seat_count INTO total_seats
-    FROM vehicles v JOIN trips t ON v.vehicle_id = t.vehicle_id
+    SELECT v.seat_count
+    INTO total_seats
+    FROM vehicles v
+    JOIN trips t ON v.vehicle_id = t.vehicle_id
     WHERE t.trip_id = p_trip_id;
 
-    SELECT COUNT(*) INTO booked_seats
-    FROM tickets t JOIN bookings b ON t.booking_id = b.booking_id
-    WHERE b.trip_id = p_trip_id AND t.status IN ('RESERVED', 'ISSUED');
+    SELECT COUNT(*)
+    INTO booked_seats
+    FROM tickets t
+    JOIN bookings b ON t.booking_id = b.booking_id
+    WHERE b.trip_id = p_trip_id
+      AND t.status IN ('RESERVED', 'ISSUED');
 
     RETURN total_seats - booked_seats;
 EXCEPTION
@@ -156,8 +189,10 @@ END;
 
 -- 5. Record the full payment and issue the tickets.
 CREATE OR REPLACE PROCEDURE record_payment (
-    p_payment_id IN NUMBER, p_booking_id IN NUMBER,
-    p_amount IN NUMBER, p_method IN VARCHAR2
+    p_payment_id IN NUMBER,
+    p_booking_id IN NUMBER,
+    p_amount IN NUMBER,
+    p_method IN VARCHAR2
 )
 AS
     booking_status bookings.status%TYPE;
@@ -168,11 +203,15 @@ AS
 BEGIN
     SELECT b.status, t.status, t.departure_at
     INTO booking_status, trip_status, departure_time
-    FROM bookings b JOIN trips t ON b.trip_id = t.trip_id
+    FROM bookings b
+    JOIN trips t ON b.trip_id = t.trip_id
     WHERE b.booking_id = p_booking_id;
 
-    SELECT SUM(fare_amount) INTO total_amount
-    FROM tickets WHERE booking_id = p_booking_id AND status = 'RESERVED';
+    SELECT SUM(fare_amount)
+    INTO total_amount
+    FROM tickets
+    WHERE booking_id = p_booking_id
+      AND status = 'RESERVED';
 
     IF booking_status <> 'PENDING' OR trip_status <> 'SCHEDULED'
        OR departure_time <= SYSDATE OR total_amount IS NULL
@@ -183,9 +222,14 @@ BEGIN
     INSERT INTO payments (payment_id, booking_id, amount, payment_method)
     VALUES (p_payment_id, p_booking_id, p_amount, p_method);
 
-    UPDATE tickets SET status = 'ISSUED'
-    WHERE booking_id = p_booking_id AND status = 'RESERVED';
-    UPDATE bookings SET status = 'CONFIRMED' WHERE booking_id = p_booking_id;
+    UPDATE tickets
+    SET status = 'ISSUED'
+    WHERE booking_id = p_booking_id
+      AND status = 'RESERVED';
+
+    UPDATE bookings
+    SET status = 'CONFIRMED'
+    WHERE booking_id = p_booking_id;
 
     DBMS_OUTPUT.PUT_LINE('Payment recorded: ' || p_amount);
 EXCEPTION
@@ -202,16 +246,23 @@ AS
     departure_time trips.departure_at%TYPE;
     invalid_cancel EXCEPTION;
 BEGIN
-    SELECT b.status, t.departure_at INTO booking_status, departure_time
-    FROM bookings b JOIN trips t ON b.trip_id = t.trip_id
+    SELECT b.status, t.departure_at
+    INTO booking_status, departure_time
+    FROM bookings b
+    JOIN trips t ON b.trip_id = t.trip_id
     WHERE b.booking_id = p_booking_id;
 
     IF booking_status = 'CANCELLED' OR departure_time <= SYSDATE THEN
         RAISE invalid_cancel;
     END IF;
 
-    UPDATE tickets SET status = 'CANCELLED' WHERE booking_id = p_booking_id;
-    UPDATE bookings SET status = 'CANCELLED' WHERE booking_id = p_booking_id;
+    UPDATE tickets
+    SET status = 'CANCELLED'
+    WHERE booking_id = p_booking_id;
+
+    UPDATE bookings
+    SET status = 'CANCELLED'
+    WHERE booking_id = p_booking_id;
 
     DBMS_OUTPUT.PUT_LINE('Booking cancelled: ' || p_booking_id);
 EXCEPTION
@@ -223,15 +274,19 @@ END cancel_booking;
 
 -- 7. Refund the full payment once, after cancellation.
 CREATE OR REPLACE PROCEDURE process_refund (
-    p_refund_id IN NUMBER, p_payment_id IN NUMBER, p_reason IN VARCHAR2
+    p_refund_id IN NUMBER,
+    p_payment_id IN NUMBER,
+    p_reason IN VARCHAR2
 )
 AS
     paid_amount payments.amount%TYPE;
     booking_status bookings.status%TYPE;
     invalid_refund EXCEPTION;
 BEGIN
-    SELECT p.amount, b.status INTO paid_amount, booking_status
-    FROM payments p JOIN bookings b ON p.booking_id = b.booking_id
+    SELECT p.amount, b.status
+    INTO paid_amount, booking_status
+    FROM payments p
+    JOIN bookings b ON p.booking_id = b.booking_id
     WHERE p.payment_id = p_payment_id;
 
     IF booking_status <> 'CANCELLED' THEN
@@ -252,7 +307,8 @@ END process_refund;
 
 -- 8. Complete a scheduled maintenance record.
 CREATE OR REPLACE PROCEDURE complete_maintenance (
-    p_maintenance_id IN NUMBER, p_cost IN NUMBER
+    p_maintenance_id IN NUMBER,
+    p_cost IN NUMBER
 )
 AS
     invalid_service EXCEPTION;

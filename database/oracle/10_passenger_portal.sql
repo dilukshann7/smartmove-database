@@ -26,8 +26,10 @@ WHERE u.role = 'PASSENGER';
 -- The booking lock serializes this operation with record_payment.
 -- An already cancelled booking returns its existing refund without a second write.
 CREATE OR REPLACE PROCEDURE smartmove_database.web_cancel_booking (
-    p_booking_id IN NUMBER, p_passenger_id IN NUMBER,
-    p_changed OUT NUMBER, p_refund_amount OUT NUMBER
+    p_booking_id IN NUMBER,
+    p_passenger_id IN NUMBER,
+    p_changed OUT NUMBER,
+    p_refund_amount OUT NUMBER
 ) AS
     v_status smartmove_database.bookings.status%TYPE;
     v_departure DATE;
@@ -37,20 +39,24 @@ CREATE OR REPLACE PROCEDURE smartmove_database.web_cancel_booking (
 BEGIN
     p_changed := 0;
     p_refund_amount := 0;
-    SELECT status INTO v_status
+    SELECT status
+    INTO v_status
     FROM smartmove_database.bookings
-    WHERE booking_id = p_booking_id AND passenger_id = p_passenger_id
+    WHERE booking_id = p_booking_id
+      AND passenger_id = p_passenger_id
     FOR UPDATE;
 
     IF v_status = 'CANCELLED' THEN
-        SELECT NVL(MAX(r.amount), 0) INTO p_refund_amount
+        SELECT NVL(MAX(r.amount), 0)
+        INTO p_refund_amount
         FROM smartmove_database.payments p
         LEFT JOIN smartmove_database.refunds r ON r.payment_id = p.payment_id
         WHERE p.booking_id = p_booking_id;
         RETURN;
     END IF;
 
-    SELECT t.departure_at INTO v_departure
+    SELECT t.departure_at
+    INTO v_departure
     FROM smartmove_database.bookings b
     JOIN smartmove_database.trips t ON t.trip_id = b.trip_id
     WHERE b.booking_id = p_booking_id;
@@ -59,15 +65,20 @@ BEGIN
     END IF;
 
     IF v_status = 'CONFIRMED' THEN
-        SELECT payment_id, amount INTO v_payment_id, v_payment_amount
-        FROM smartmove_database.payments WHERE booking_id = p_booking_id;
+        SELECT payment_id, amount
+        INTO v_payment_id, v_payment_amount
+        FROM smartmove_database.payments
+        WHERE booking_id = p_booking_id;
     END IF;
 
     smartmove_database.cancel_booking(p_booking_id);
     IF v_status = 'CONFIRMED' THEN
         v_refund_id := smartmove_database.web_refund_seq.NEXTVAL;
-        smartmove_database.process_refund(v_refund_id, v_payment_id,
-                                       'Passenger cancelled before departure');
+        smartmove_database.process_refund(
+            v_refund_id,
+            v_payment_id,
+            'Passenger cancelled before departure'
+        );
         p_refund_amount := v_payment_amount;
     END IF;
     p_changed := 1;
@@ -75,7 +86,9 @@ END;
 /
 
 CREATE OR REPLACE PROCEDURE smartmove_database.web_update_profile (
-    p_passenger_id IN NUMBER, p_name IN VARCHAR2, p_phone IN VARCHAR2
+    p_passenger_id IN NUMBER,
+    p_name IN VARCHAR2,
+    p_phone IN VARCHAR2
 ) AS
 BEGIN
     UPDATE smartmove_database.passengers
@@ -89,16 +102,20 @@ END;
 
 -- Oracle stores the reference and workflow state; MongoDB stores the content.
 CREATE OR REPLACE PROCEDURE smartmove_database.web_submit_feedback (
-    p_feedback_id IN NUMBER, p_booking_id IN NUMBER,
-    p_passenger_id IN NUMBER, p_type IN VARCHAR2
+    p_feedback_id IN NUMBER,
+    p_booking_id IN NUMBER,
+    p_passenger_id IN NUMBER,
+    p_type IN VARCHAR2
 ) AS
     v_booking_status smartmove_database.bookings.status%TYPE;
     v_trip_status smartmove_database.trips.status%TYPE;
 BEGIN
-    SELECT b.status, t.status INTO v_booking_status, v_trip_status
+    SELECT b.status, t.status
+    INTO v_booking_status, v_trip_status
     FROM smartmove_database.bookings b
     JOIN smartmove_database.trips t ON t.trip_id = b.trip_id
-    WHERE b.booking_id = p_booking_id AND b.passenger_id = p_passenger_id;
+    WHERE b.booking_id = p_booking_id
+      AND b.passenger_id = p_passenger_id;
     IF p_type NOT IN ('REVIEW', 'COMPLAINT') OR p_type IS NULL THEN
         RAISE_APPLICATION_ERROR(-20023, 'Invalid feedback type.');
     END IF;
