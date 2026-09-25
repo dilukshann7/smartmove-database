@@ -1,4 +1,4 @@
--- Optional procedure practice as SMARTMOVE_OWNER after installing all objects.
+-- Optional procedure practice as SMARTMOVE_DATABASE after installing all objects.
 -- Use a separate session with no unsaved work and saved original sample data.
 -- IDs 90 and 91 must be unused. Nothing is committed.
 WHENEVER SQLERROR EXIT FAILURE ROLLBACK

@@ -2,13 +2,13 @@
 
 Oracle SQL and PL/SQL for transport records, with MongoDB for feedback content and media links. Management and booking operations use short standalone PL/SQL procedures. Queries and reports read the results.
 
-**The full revised coursework script set has not been run or compiled in Oracle.** See the separate website integration update below.
+The populated `SMARTMOVE_DATABASE` schema in the local `XEPDB1` PDB contains the base coursework objects and sample data. Do not rerun the account, schema, or sample-data scripts there.
 
-**Website integration update (2026-09-23):** The separate one-time `database/oracle/09_web_integration.sql` migration was applied to the local `XEPDB1` database for the SmartMove website. Its booking, seat, payment, search, account and hold-expiry objects compile as valid. This does not mean the entire revised coursework script set above was executed. The base schema and sample data were not rerun. The `SMARTMOVE_WEB` account uses a generated local password held in the website's ignored `.env.local` file.
+**Website integration update (2026-09-25):** Migrations `09_web_integration.sql`, `10_passenger_portal.sql`, and `11_admin_workspace.sql` are applied to `SMARTMOVE_DATABASE` in `XEPDB1`. The base schema and sample data were preserved. All schema objects compile as valid. `SMARTMOVE_DATABASE_APP` is the website login and `SMARTMOVE_DATABASE_REPORT` is reserved for reporting. Local passwords are held in ignored environment files.
 
-**Passenger portal update (2026-09-23):** The one-time `database/oracle/10_passenger_portal.sql` migration was applied after migration 09. It adds locked whole-booking cancellation, full refund recording in the same Oracle transaction, profile updates, feedback eligibility and a unique review index. Rollback and concurrency tests are in `database/oracle/tests/`. MongoDB stores feedback content and the notification inbox. A recorded refund is not an external payout.
+**Passenger portal update:** Migration 10 adds locked whole-booking cancellation, full refund recording in the same Oracle transaction, profile updates, feedback eligibility and a unique review index. Rollback and concurrency tests are in `database/oracle/tests/`. MongoDB stores feedback content and the notification inbox. A recorded refund is not an external payout.
 
-**Admin workspace update (2026-09-23):** The one-time `database/oracle/11_admin_workspace.sql` migration was applied after migration 10. It adds ADMIN sessions, sequences, scoped payment/refund and trip-cancellation procedures, and grants. Required management and trip operation procedures were compiled for the first time in the populated schema; the base tables and sample data were not rerun. `database/oracle/tests/11_admin_workspace_rollback.sql` exercises the new workflows without retaining test records.
+**Admin workspace update:** Migration 11 adds ADMIN sessions, sequences, scoped payment/refund and trip-cancellation procedures, and grants. Required management and trip operation procedures were compiled in the populated schema; the base tables and sample data were not rerun. Rollback tests exercise the workflows without retaining test records.
 
 ## Read these files in order
 
@@ -24,7 +24,7 @@ Oracle SQL and PL/SQL for transport records, with MongoDB for feedback content a
 | `database/oracle/06_permissions.sql` | Trip/user views, procedure grants and application read access |
 | `database/oracle/07_basic_operations.sql` | Optional management procedure walkthrough |
 | `database/oracle/08_booking_example.sql` | Optional booking, payment, cancellation and refund walkthrough |
-| `database/oracle/09_web_integration.sql` | One-time live website migration; requires a separately created `SMARTMOVE_WEB` user |
+| `database/oracle/09_web_integration.sql` | One-time website integration migration; run after the base schema as SYSDBA |
 | `database/oracle/10_passenger_portal.sql` | One-time passenger dashboard and feedback migration; apply after 09 |
 | `database/oracle/11_admin_workspace.sql` | One-time ADMIN operations migration; apply after 10 |
 
@@ -54,7 +54,7 @@ Do not rerun setup or sample inserts in the populated local databases. This scri
 
 Procedures do not commit. On failure, stop and roll back the pending workflow. Files 05, 07 and 08 include `WHENEVER SQLERROR` for script mode; if running selected statements instead, stop manually on errors. Creating tables/procedures/views is DDL and cannot be undone by rolling back the data.
 
-For the already populated baseline, a later update needs the three 03 files and file 06 only; do not rerun account, table or sample setup. Apply DDL in a session without pending changes and check compilation before examples.
+For the already populated `SMARTMOVE_DATABASE` schema, do not rerun files 01, 02, or 05, or one-time migrations 09–11. A later base-logic update needs the three 03 files and file 06 only. Apply DDL in a session without pending changes and check compilation before examples.
 
 No build or development server is needed.
 

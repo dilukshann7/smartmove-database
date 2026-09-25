@@ -11,8 +11,8 @@ $cleanup = Join-Path $dir 'cleanup.sql'
 WHENEVER SQLERROR EXIT SQL.SQLCODE ROLLBACK
 ALTER SESSION SET CONTAINER=XEPDB1;
 BEGIN
-  smartmove_owner.create_booking(990010, 1, 2);
-  smartmove_owner.reserve_seat(990010, 990010, 8);
+  smartmove_database.create_booking(990010, 1, 2);
+  smartmove_database.reserve_seat(990010, 990010, 8);
   COMMIT;
 END;
 /
@@ -23,7 +23,7 @@ ALTER SESSION SET CONTAINER=XEPDB1;
 SET SERVEROUTPUT ON
 DECLARE v_changed NUMBER; v_refund NUMBER;
 BEGIN
-  smartmove_owner.web_cancel_booking(990010, 1, v_changed, v_refund);
+  smartmove_database.web_cancel_booking(990010, 1, v_changed, v_refund);
   DBMS_OUTPUT.PUT_LINE('CANCEL_LOCKED');
   DBMS_LOCK.SLEEP(4);
   ROLLBACK;
@@ -36,7 +36,7 @@ ALTER SESSION SET CONTAINER=XEPDB1;
 SET SERVEROUTPUT ON
 SET TIMING ON
 BEGIN
-  smartmove_owner.record_payment(990010, 990010, 800, 'CASH');
+  smartmove_database.record_payment(990010, 990010, 800, 'CASH');
   DBMS_OUTPUT.PUT_LINE('PAYMENT_AFTER_LOCK');
   ROLLBACK;
 END;
@@ -45,10 +45,10 @@ END;
 @'
 WHENEVER SQLERROR EXIT SQL.SQLCODE ROLLBACK
 ALTER SESSION SET CONTAINER=XEPDB1;
-DELETE FROM smartmove_owner.payments WHERE booking_id=990010;
-DELETE FROM smartmove_owner.booking_status_history WHERE booking_id=990010;
-DELETE FROM smartmove_owner.tickets WHERE booking_id=990010;
-DELETE FROM smartmove_owner.bookings WHERE booking_id=990010;
+DELETE FROM smartmove_database.payments WHERE booking_id=990010;
+DELETE FROM smartmove_database.booking_status_history WHERE booking_id=990010;
+DELETE FROM smartmove_database.tickets WHERE booking_id=990010;
+DELETE FROM smartmove_database.bookings WHERE booking_id=990010;
 COMMIT;
 '@ | Set-Content -LiteralPath $cleanup
 try {

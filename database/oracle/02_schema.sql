@@ -1,4 +1,4 @@
--- Run as SMARTMOVE_OWNER in a fresh, empty schema.
+-- Run as SMARTMOVE_DATABASE in a fresh, empty schema.
 -- Enter IDs yourself: 1, 2, 3, etc. Oracle DATE stores both date and time.
 
 CREATE TABLE app_users (

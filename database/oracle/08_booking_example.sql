@@ -1,4 +1,4 @@
--- Optional trip/booking walkthrough as SMARTMOVE_OWNER after all objects and samples.
+-- Optional trip/booking walkthrough as SMARTMOVE_DATABASE after all objects and samples.
 -- Use a clean session. IDs 90, 91 and 92 must be unused in the affected tables.
 -- Assumes the unchanged small sample dataset; all practice changes roll back.
 WHENEVER SQLERROR EXIT FAILURE ROLLBACK
